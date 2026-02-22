@@ -1,7 +1,0 @@
-python-telegram-bot==20.3
-feedparser==6.0.10
-requests==2.31.0
-beautifulsoup4==4.12.2
-textblob==0.17.1
-pandas==2.1.1
-python-dotenv==1.0.0
