@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Astronacci Pro – Stock Signal Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+
+<body>
+    <!-- Header -->
+    <header>
+        <div class="header-inner">
+            <div class="logo">
+                <span class="logo-icon">📈</span>
+                <div>
+                    <h1>Astronacci Pro</h1>
+                    <span class="subtitle">Stock Signal Dashboard</span>
+                </div>
+            </div>
+            <div class="search-box">
+                <input type="text" id="symbolInput" placeholder="Kode saham (e.g. BBCA)" autocomplete="off">
+                <input type="text" id="priceInput" placeholder="Harga (opsional)" autocomplete="off">
+                <button id="analyzeBtn" onclick="analyze()">
+                    <span class="btn-text">Analisis</span>
+                    <span class="btn-loading" style="display:none;">⏳</span>
+                </button>
+            </div>
+            <div class="header-actions">
+                <button class="tg-test-btn" onclick="testTelegram()" title="Uji Notifikasi Telegram">
+                    🤖 <span class="hide-mobile">Test Bot</span>
+                </button>
+                <button class="watchlist-toggle-btn" onclick="toggleWatchlist()">
+                    ⭐ <span class="hide-mobile">Watchlist</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Watchlist Sidebar -->
+    <div id="watchlistSidebar" class="watchlist-sidebar">
+        <div class="watchlist-header">
+            <h3>⭐ My Watchlist</h3>
+            <button class="close-btn" onclick="toggleWatchlist()">×</button>
+        </div>
+        <div id="watchlistContent" class="watchlist-rows">
+            <div class="empty-state">Belum ada saham favorit.</div>
+        </div>
+    </div>
+    <div id="overlay" class="overlay" onclick="toggleWatchlist()"></div>
+
+    <!-- Placeholder / Home -->
+    <div id="placeholder" class="placeholder">
+        <!-- New Screener Section -->
+        <div class="screener-section">
+            <div class="screener-header">
+                <div class="screener-tabs">
+                    <button id="tabLQ45" class="screener-tab active" onclick="switchScanner('LQ45')">🔥 LQ45 PICKS</button>
+                    <button id="tabMB" class="screener-tab" onclick="switchScanner('MULTIBAGGER')">🚀 MULTIBAGGER</button>
+                </div>
+                <button class="run-screener-btn" id="runScreenerBtn" onclick="runScreenerManual()">🔄 Refresh Scan</button>
+            </div>
+            <div id="screenerContent" class="screener-grid">
+                <div class="screener-loading">Memuat sinyal terbaik...</div>
+            </div>
+        </div>
+
+        <div class="placeholder-main">
+            <div class="placeholder-icon">🎯</div>
+            <h2>Pencarian Saham</h2>
+            <p>Ketik kode saham IDX di atas untuk analisis detail Astronacci</p>
+            <div class="quick-picks">
+                <button onclick="quickAnalyze('BBCA')">BBCA</button>
+                <button onclick="quickAnalyze('BBRI')">BBRI</button>
+                <button onclick="quickAnalyze('TLKM')">TLKM</button>
+                <button onclick="quickAnalyze('GOTO')">GOTO</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Error -->
+    <div id="errorBox" class="error-box" style="display:none;">
+        <span>⚠️</span> <span id="errorText"></span>
+    </div>
+
+    <!-- Data Warning Banner (for estimated data) -->
+    <div id="warningBanner" class="warning-banner" style="display:none;">
+        <span>⚠️</span> <span id="warningText"></span>
+    </div>
+
+    <!-- Dashboard -->
+    <main id="dashboard" style="display:none;">
+        <!-- Top Cards -->
+        <div class="top-row">
+            <div class="card signal-card" id="signalCard">
+                <div class="card-label">SINYAL</div>
+                <div class="signal-text" id="signalText">--</div>
+                <div class="symbol-name-row">
+                    <div class="symbol-name" id="symbolName">--</div>
+                    <button id="watchlistBtn" class="watchlist-btn" onclick="handleWatchlistToggle()">
+                        ⭐
+                    </button>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-label">HARGA TERKINI</div>
+                <div class="big-number" id="currentPrice">--</div>
+            </div>
+            <div class="card">
+                <div class="card-label">SKOR KEKUATAN</div>
+                <div class="score-gauge">
+                    <svg viewBox="0 0 120 70" id="gaugeChart">
+                        <path d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke="#1e293b" stroke-width="10"
+                            stroke-linecap="round" />
+                        <path d="M 10 65 A 50 50 0 0 1 110 65" fill="none" stroke="url(#gaugeGrad)" stroke-width="10"
+                            stroke-linecap="round" id="gaugeFill" stroke-dasharray="0 157" />
+                        <defs>
+                            <linearGradient id="gaugeGrad">
+                                <stop offset="0%" stop-color="#ef4444" />
+                                <stop offset="40%" stop-color="#f59e0b" />
+                                <stop offset="70%" stop-color="#22c55e" />
+                                <stop offset="100%" stop-color="#06b6d4" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    <div class="score-number" id="scoreText">--</div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-label">RISK : REWARD</div>
+                <div class="rr-display">
+                    <span class="rr-number" id="rrRatio">--</span>
+                    <span class="rr-label" id="rrLabel">--</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Middle Row: Fibonacci + Indicators -->
+        <div class="mid-row">
+            <!-- Fibonacci Levels -->
+            <div class="card fib-card">
+                <div class="card-label">📐 FIBONACCI ASTRONACCI</div>
+                <div class="fib-info">
+                    <span>Swing High: <strong id="swingHigh">--</strong></span>
+                    <span>Swing Low: <strong id="swingLow">--</strong></span>
+                    <span>Zona: <strong id="fibZone">--</strong></span>
+                </div>
+                <div class="fib-chart" id="fibChart"></div>
+            </div>
+
+            <!-- Indicators Panel -->
+            <div class="card indicators-card">
+                <div class="card-label">📊 INDIKATOR TEKNIKAL</div>
+                <div class="indicator-grid">
+                    <div class="indicator">
+                        <div class="ind-label">RSI (14)</div>
+                        <div class="ind-bar-wrap">
+                            <div class="ind-bar rsi-bar" id="rsiBar"></div>
+                        </div>
+                        <div class="ind-value" id="rsiValue">--</div>
+                    </div>
+                    <div class="indicator">
+                        <div class="ind-label">Stochastic %K</div>
+                        <div class="ind-bar-wrap">
+                            <div class="ind-bar stoch-bar" id="stochBar"></div>
+                        </div>
+                        <div class="ind-value" id="stochValue">--</div>
+                    </div>
+                    <div class="indicator">
+                        <div class="ind-label">ADX (Tren)</div>
+                        <div class="ind-bar-wrap">
+                            <div class="ind-bar adx-bar" id="adxBar"></div>
+                        </div>
+                        <div class="ind-value" id="adxValue">--</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Patterns Row -->
+        <div class="patterns-row" id="patternsRow" style="display:none;">
+            <div class="card patterns-card">
+                <div class="card-label">🔍 POLA TERDETEKSI</div>
+                <div class="patterns-list" id="patternsList"></div>
+            </div>
+        </div>
+
+        <!-- Bottom Row: Recommendations -->
+        <div class="bottom-row">
+            <div class="card rec-card rec-buy">
+                <div class="rec-icon">🟢</div>
+                <div class="rec-label">ENTRY (BELI)</div>
+                <div class="rec-price" id="buyPrice">--</div>
+            </div>
+            <div class="card rec-card rec-tp">
+                <div class="rec-icon">🎯</div>
+                <div class="rec-label">TAKE PROFIT</div>
+                <div class="rec-price" id="tpPrice">--</div>
+            </div>
+            <div class="card rec-card rec-sl">
+                <div class="rec-icon">🛑</div>
+                <div class="rec-label">STOP LOSS</div>
+                <div class="rec-price" id="slPrice">--</div>
+            </div>
+        </div>
+
+        <!-- Quick Execution & Platform Integration -->
+        <div class="execution-row" id="executionRow" style="display:none;">
+            <div class="card execution-card">
+                <div class="execution-header">
+                    <span class="stockbit-logo">🍏</span>
+                    <span class="execution-title">STOCKBIT INTEGRATION</span>
+                </div>
+                <div class="execution-buttons">
+                    <a id="tradeLink" href="#" target="_blank" class="btn-trade">
+                        <span class="btn-icon">⚡</span> TRADE ON STOCKBIT
+                    </a>
+                    <a id="streamLink" href="#" target="_blank" class="btn-stream">
+                        <span class="btn-icon">💬</span> CHECK COMMUNITY STREAM
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- AI Expert Insights Card -->
+        <div class="insight-row" id="insightRow" style="display:none;">
+            <div class="card insight-card">
+                <div class="insight-header">
+                    <span class="insight-icon">🤖</span>
+                    <span class="insight-title">AI EXPERT INSIGHTS</span>
+                </div>
+                <div class="insight-body" id="aiCommentary">
+                    <!-- AI Narrative will be typed here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Price Chart -->
+        <div class="chart-row">
+            <div class="card chart-card">
+                <div class="card-label">📈 CHART HARGA (CANDLESTICK)</div>
+                <div id="priceChart" style="width: 100%; height: 320px;"></div>
+            </div>
+        </div>
+
+        <!-- IHSG Market Context Banner -->
+        <div class="market-banner" id="marketBanner" style="display:none;">
+            <span class="market-icon" id="marketIcon">📊</span>
+            <span class="market-text" id="marketText">IHSG: Loading...</span>
+        </div>
+
+        <!-- Sentiment Banner -->
+        <div class="sentiment-banner-wrapper">
+            <div class="sentiment-banner" id="sentimentBanner" style="display:none;" onclick="toggleSentimentList()">
+                <div class="sentiment-main">
+                    <span class="sentiment-badge" id="sentimentBadge">⚪ Netral</span>
+                    <span class="sentiment-detail" id="sentimentDetail">Memuat sentimen...</span>
+                    <span class="sentiment-impact" id="sentimentImpact"></span>
+                </div>
+                <div class="sentiment-toggle-icon">▼</div>
+            </div>
+            <div class="sentiment-list-popup" id="sentimentHeadlineList" style="display:none;">
+                <!-- Headlines will be inserted here -->
+            </div>
+        </div>
+
+        <!-- Advanced Analysis Row: Multi-TF + Confidence -->
+        <div class="advanced-row" id="advancedRow" style="display:none;">
+            <!-- Multi-Timeframe Confluence -->
+            <div class="card mtf-card">
+                <div class="card-label">⏱️ MULTI-TIMEFRAME CONFLUENCE</div>
+                <table class="mtf-table">
+                    <thead>
+                        <tr>
+                            <th>Timeframe</th>
+                            <th>Trend</th>
+                            <th>RSI</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>Daily</td>
+                            <td id="mtfDaily">--</td>
+                            <td id="mtfDailyRsi">--</td>
+                        </tr>
+                        <tr>
+                            <td>Weekly</td>
+                            <td id="mtfWeekly">--</td>
+                            <td id="mtfWeeklyRsi">--</td>
+                        </tr>
+                        <tr>
+                            <td>Monthly</td>
+                            <td id="mtfMonthly">--</td>
+                            <td id="mtfMonthlyRsi">--</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="mtf-score" id="mtfScore">Confluence: --</div>
+            </div>
+
+            <!-- Confidence Meter + Volume Analysis -->
+            <div class="card confidence-card">
+                <div class="card-label">🎯 TINGKAT KEPERCAYAAN</div>
+                <div class="confidence-gauge">
+                    <div class="conf-meter">
+                        <div class="conf-fill" id="confFill"></div>
+                    </div>
+                    <div class="conf-value" id="confValue">--%</div>
+                    <div class="conf-label" id="confLabel">Memuat...</div>
+                </div>
+                <div class="vol-analysis" id="volAnalysis">
+                    <div class="vol-item"><span>📊 Vol Ratio</span><span id="volRatio">--</span></div>
+                    <div class="vol-item"><span>💰 OBV Trend</span><span id="obvTrend">--</span></div>
+                    <div class="vol-item"><span>🔗 Vol-Price</span><span id="volPrice">--</span></div>
+                </div>
+            </div>
+
+            <!-- Foreign Flow & Fundamental Stats -->
+            <div class="card intellect-card">
+                <div class="card-label">🧠 MARKET INTELLIGENCE</div>
+                <div class="intellect-badge" id="ffBadge">--</div>
+                <div class="intellect-desc" id="ffDesc">Menganalisis Smart Money...</div>
+
+                <div class="fundamental-grid">
+                    <div class="stat-item">
+                        <span class="stat-label">P/E Ratio</span>
+                        <span class="stat-value" id="peVal">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">P/BV Ratio</span>
+                        <span class="stat-value" id="pbvVal">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">Dividend %</span>
+                        <span class="stat-value" id="divVal">--</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-label">ROE %</span>
+                        <span class="stat-value" id="roeVal">--</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Backtest Results + Position Sizing -->
+        <div class="tools-row" id="toolsRow" style="display:none;">
+            <!-- Backtest Results -->
+            <div class="card backtest-card">
+                <div class="card-label">📊 BACKTEST HISTORIS</div>
+                <div class="backtest-content" id="backtestContent">
+                    <div class="news-loading">Menghitung win rate...</div>
+                </div>
+            </div>
+
+            <!-- Position Sizing -->
+            <div class="card possize-card">
+                <div class="card-label">💰 POSITION SIZING</div>
+                <div class="possize-form">
+                    <div class="possize-input-row">
+                        <label>Modal (Rp)</label>
+                        <input type="number" id="modalInput" value="10000000" placeholder="10.000.000">
+                    </div>
+                    <div class="possize-input-row">
+                        <label>Risiko (%)</label>
+                        <input type="number" id="riskInput" value="2" step="0.5" min="0.5" max="10">
+                    </div>
+                    <button class="possize-btn" onclick="calcPosition()">Hitung</button>
+                </div>
+                <div class="possize-result" id="possizeResult"></div>
+            </div>
+        </div>
+
+        <!-- Stock News (shown after analysis) -->
+        <div class="news-row" id="stockNewsRow" style="display:none;">
+            <div class="card news-card">
+                <div class="card-label">📰 BERITA <span id="stockNewsTitle"></span></div>
+                <div class="news-list" id="stockNewsList">
+                    <div class="news-loading">Memuat berita...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- General Market News (shown on landing page) -->
+    <div id="marketNewsSection" class="market-news-section">
+        <div class="market-news-inner">
+            <h3 class="news-section-title">📰 Berita Pasar Terkini</h3>
+            <p class="news-section-sub">Dari sumber terpercaya Indonesia</p>
+            <div class="news-list" id="marketNewsList">
+                <div class="news-loading">Memuat berita pasar...</div>
+            </div>
+            <div class="news-sources-badge">
+                <span>Sumber:</span>
+                <span class="source-badge" style="--badge-color:#0070f3">📺 CNBC Indonesia</span>
+                <span class="source-badge" style="--badge-color:#e11d48">📰 Kontan</span>
+                <span class="source-badge" style="--badge-color:#059669">💼 Bisnis.com</span>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>⚠️ Asisten ini TIDAK melakukan transaksi otomatis. Keputusan akhir ada di tangan Anda.</p>
+    </footer>
+
+    <script>
+        // ============================================================
+        // CORE LOGIC
+        // ============================================================
+
+        function quickAnalyze(sym) {
+            document.getElementById('symbolInput').value = sym;
+            document.getElementById('priceInput').value = '';
+            analyze();
+        }
+
+        async function analyze() {
+            const symbol = document.getElementById('symbolInput').value.trim().toUpperCase();
+            const priceStr = document.getElementById('priceInput').value.trim();
+            const btn = document.getElementById('analyzeBtn');
+
+            if (!symbol) return;
+
+            // Loading state
+            btn.querySelector('.btn-text').style.display = 'none';
+            btn.querySelector('.btn-loading').style.display = 'inline';
+            btn.disabled = true;
+            document.getElementById('errorBox').style.display = 'none';
+
+            try {
+                const body = { symbol };
+                if (priceStr) body.price = parseFloat(priceStr);
+
+                const res = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                // Pastikan response adalah JSON, bukan HTML error page
+                const contentType = res.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) {
+                    throw new Error('Server mengembalikan response tidak valid. Coba restart server.');
+                }
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    // Jika perlu harga manual, focus ke input harga
+                    if (data.need_price) {
+                        const priceInput = document.getElementById('priceInput');
+                        priceInput.placeholder = 'Masukkan harga saham!';
+                        priceInput.focus();
+                        priceInput.style.borderColor = '#f59e0b';
+                        setTimeout(() => { priceInput.style.borderColor = ''; priceInput.placeholder = 'Harga (opsional)'; }, 4000);
+                    }
+                    throw new Error(data.error || 'Gagal menganalisis');
+                }
+
+                renderDashboard(data);
+
+            } catch (err) {
+                document.getElementById('errorText').textContent = err.message;
+                document.getElementById('errorBox').style.display = 'flex';
+                document.getElementById('dashboard').style.display = 'none';
+                document.getElementById('placeholder').style.display = 'flex';
+                document.getElementById('warningBanner').style.display = 'none';
+                document.getElementById('marketNewsSection').style.display = 'block';
+            } finally {
+                btn.querySelector('.btn-text').style.display = 'inline';
+                btn.querySelector('.btn-loading').style.display = 'none';
+                btn.disabled = false;
+            }
+        }
+
+        function renderDashboard(d) {
+            document.getElementById('placeholder').style.display = 'none';
+            document.getElementById('errorBox').style.display = 'none';
+            document.getElementById('dashboard').style.display = 'block';
+
+            // Show data warning if estimated
+            const warningBanner = document.getElementById('warningBanner');
+            if (d.is_estimated && d.data_warning) {
+                document.getElementById('warningText').textContent = d.data_warning;
+                warningBanner.style.display = 'flex';
+            } else {
+                warningBanner.style.display = 'none';
+            }
+
+            // Signal Card
+            const signalCard = document.getElementById('signalCard');
+            const signalText = d.signal;
+            document.getElementById('signalText').textContent = signalText;
+            document.getElementById('symbolName').textContent = d.symbol;
+
+            signalCard.className = 'card signal-card';
+            if (signalText.includes('STRONG_BUY')) signalCard.classList.add('sig-strong-buy');
+            else if (signalText.includes('BUY')) signalCard.classList.add('sig-buy');
+            else if (signalText.includes('STRONG_SELL')) signalCard.classList.add('sig-strong-sell');
+            else if (signalText.includes('SELL')) signalCard.classList.add('sig-sell');
+            else signalCard.classList.add('sig-neutral');
+
+            // Price
+            document.getElementById('currentPrice').textContent = formatNum(d.current_price);
+
+            // Score Gauge
+            const score = d.score;
+            const pct = score / 100;
+            const dashLen = pct * 157;
+            document.getElementById('gaugeFill').setAttribute('stroke-dasharray', `${dashLen} 157`);
+            document.getElementById('scoreText').textContent = `${score}/100`;
+
+            // RR Ratio
+            const rr = d.rr_ratio;
+            document.getElementById('rrRatio').textContent = `1:${rr.toFixed(2)}`;
+            const rrLabel = document.getElementById('rrLabel');
+            if (rr >= 2) { rrLabel.textContent = 'Baik ✓'; rrLabel.className = 'rr-label rr-good'; }
+            else if (rr >= 1) { rrLabel.textContent = 'Cukup'; rrLabel.className = 'rr-label rr-ok'; }
+            else { rrLabel.textContent = 'Buruk ✗'; rrLabel.className = 'rr-label rr-bad'; }
+
+            // Fibonacci
+            document.getElementById('swingHigh').textContent = formatNum(d.swing_high);
+            document.getElementById('swingLow').textContent = formatNum(d.swing_low);
+            document.getElementById('fibZone').textContent = d.fib_zone;
+            renderFibChart(d.fib_levels, d.current_price);
+
+            // Indicators
+            renderIndicator('rsi', d.rsi, 100);
+            renderIndicator('stoch', d.stoch_k, 100);
+            renderIndicator('adx', d.adx, 60);
+
+            // Patterns
+            if (d.patterns && d.patterns.length > 0) {
+                document.getElementById('patternsRow').style.display = 'block';
+                const list = document.getElementById('patternsList');
+                list.innerHTML = d.patterns.map(p => `<span class="pattern-tag">${p}</span>`).join('');
+            } else {
+                document.getElementById('patternsRow').style.display = 'none';
+            }
+
+            // Recommendations
+            document.getElementById('buyPrice').textContent = formatNum(d.buy_price);
+            document.getElementById('tpPrice').textContent = formatNum(d.sell_target);
+            document.getElementById('slPrice').textContent = formatNum(d.stop_loss);
+
+            // Price Chart
+            if (d.history) renderPriceChart(d.history, d.fib_levels);
+
+            // IHSG Market Trend Banner
+            if (d.market_trend && d.market_trend.trend !== 'N/A') {
+                const mt = d.market_trend;
+                const banner = document.getElementById('marketBanner');
+                banner.style.display = 'flex';
+                const isUp = mt.trend === 'BULLISH';
+                const isSameDir = (isUp && d.signal.includes('BUY')) || (!isUp && d.signal.includes('SELL'));
+                banner.className = 'market-banner ' + (isUp ? 'market-bull' : 'market-bear');
+                document.getElementById('marketIcon').textContent = isUp ? '📈' : '📉';
+                const chg = mt.change_pct >= 0 ? `+${mt.change_pct}%` : `${mt.change_pct}%`;
+                let warning = '';
+                if (!isSameDir && (d.signal.includes('BUY') || d.signal.includes('SELL'))) {
+                    warning = ' ⚠️ Sinyal melawan arus pasar!';
+                }
+                document.getElementById('marketText').textContent =
+                    `IHSG ${formatNum(mt.level)} (${chg}) — Trend ${mt.trend}${warning}`;
+            }
+
+            // Multi-Timeframe Confluence
+            if (d.multi_timeframe) {
+                document.getElementById('advancedRow').style.display = 'grid';
+                const mtf = d.multi_timeframe;
+                renderMTF('Daily', mtf.daily, 'mtfDaily', 'mtfDailyRsi');
+                renderMTF('Weekly', mtf.weekly, 'mtfWeekly', 'mtfWeeklyRsi');
+                renderMTF('Monthly', mtf.monthly, 'mtfMonthly', 'mtfMonthlyRsi');
+                document.getElementById('mtfScore').innerHTML =
+                    `Confluence: <strong>${mtf.confluence_score}/100</strong> — ${mtf.confluence_label}`;
+
+                // Confidence Meter (combines score + confluence)
+                const confScore = Math.round((d.score * 0.6) + (mtf.confluence_score * 0.4));
+                renderConfidence(confScore);
+            } else {
+                renderConfidence(d.score);
+            }
+
+            // Volume Analysis
+            if (d.volume_analysis) {
+                // Update Volume Analysis
+                const vol = d.volume_analysis;
+                document.getElementById('volRatio').textContent = vol.vol_ratio + 'x';
+                document.getElementById('obvTrend').textContent = vol.obv_up ? '💎 Akumulasi' : '🔻 Distribusi';
+                document.getElementById('volPrice').textContent = vol.vol_price_confirm ? '✓ Konfirmasi' : '❌ Divergensi';
+            }
+
+            // Update Intelligence (Foreign Flow)
+            if (d.money_flow) {
+                const ff = d.money_flow;
+                const ffBadge = document.getElementById('ffBadge');
+                ffBadge.textContent = ff.status;
+                ffBadge.className = 'intellect-badge ' + (ff.status === 'ACCUMULATION' ? 'status-acc' : (ff.status === 'DISTRIBUTION' ? 'status-dist' : 'status-neutral'));
+                document.getElementById('ffDesc').textContent = ff.desc;
+            }
+
+            // Update Stockbit Links
+            document.getElementById('executionRow').style.display = 'block';
+            document.getElementById('tradeLink').href = `https://stockbit.com/symbol/${d.symbol}/order`;
+            document.getElementById('streamLink').href = `https://stockbit.com/symbol/${d.symbol}`;
+
+            // Update Fundamental Stats
+            if (d.fundamental) {
+                const fund = d.fundamental;
+                document.getElementById('peVal').textContent = fund.pe_ratio > 0 ? fund.pe_ratio : 'N/A';
+                document.getElementById('pbvVal').textContent = fund.pbv_ratio > 0 ? fund.pbv_ratio : 'N/A';
+                document.getElementById('divVal').textContent = fund.dividend_yield > 0 ? fund.dividend_yield + '%' : '0%';
+                document.getElementById('roeVal').textContent = fund.roe > 0 ? fund.roe + '%' : 'N/A';
+            }
+
+            // AI Commentary with Typewriter Effect
+            document.getElementById('insightRow').style.display = 'block';
+            typeWriterEffect('aiCommentary', d.ai_commentary);
+
+            // Show tools row & trigger backtest
+            document.getElementById('toolsRow').style.display = 'grid';
+            loadBacktest(d.symbol);
+
+            // Sentiment Banner
+            if (d.sentiment) {
+                const banner = document.getElementById('sentimentBanner');
+                const badge = document.getElementById('sentimentBadge');
+                const detail = document.getElementById('sentimentDetail');
+                const impact = document.getElementById('sentimentImpact');
+                const list = document.getElementById('sentimentHeadlineList');
+
+                banner.style.display = 'flex';
+                badge.textContent = `${d.sentiment.label === 'Positif' || d.sentiment.label === 'Sangat Positif' ? '🟢' : (d.sentiment.label === 'Negatif' || d.sentiment.label === 'Sangat Negatif' ? '🔴' : '⚪')} ${d.sentiment.label}`;
+
+                // Color formatting
+                badge.className = 'sentiment-badge';
+                if (d.sentiment.score >= 10) badge.classList.add('sent-pos');
+                else if (d.sentiment.score <= -10) badge.classList.add('sent-neg');
+                else badge.classList.add('sent-neu');
+
+                detail.textContent = d.sentiment.detail;
+
+                if (d.sentiment_impact) {
+                    const si = d.sentiment_impact;
+                    impact.textContent = `(Efek: Entry ${si.entry_effect}, TP ${si.tp_effect}, SL ${si.sl_effect})`;
+                } else {
+                    impact.textContent = '';
+                }
+
+                // Render headlines with mini-badges
+                if (d.sentiment.headlines && d.sentiment.headlines.length > 0) {
+                    list.innerHTML = d.sentiment.headlines.map(h => {
+                        const s = h.sentiment;
+                        const icon = s === 'positive' ? '🟢' : (s === 'negative' ? '🔴' : '⚪');
+                        const cls = s === 'positive' ? 'h-pos' : (s === 'negative' ? 'h-neg' : 'h-neu');
+                        return `
+                        <div class="sentiment-list-item">
+                            <span class="h-badge ${cls}">${icon}</span>
+                            <span class="h-title">${h.title}</span>
+                            <span class="h-source">${h.source}</span>
+                        </div>`;
+                    }).join('');
+                } else {
+                    list.innerHTML = '<div class="news-empty">Tidak ada detail berita.</div>';
+                }
+            }
+
+            // Sync Watchlist Button State
+            updateWatchlistBtnState();
+
+            // Store data for position sizing
+            window._lastAnalysis = d;
+            calcPosition();
+
+            // Stock-specific news
+            document.getElementById('marketNewsSection').style.display = 'none';
+            loadStockNews(d.symbol);
+        }
+
+        function renderMTF(label, data, trendId, rsiId) {
+            if (!data || data.trend === 'N/A') return;
+            const el = document.getElementById(trendId);
+            const color = data.trend === 'BULLISH' ? 'var(--accent-green)'
+                : data.trend === 'BEARISH' ? 'var(--accent-red)' : 'var(--text-muted)';
+            el.innerHTML = `<span style="color:${color};font-weight:700">${data.trend}</span>`;
+            document.getElementById(rsiId).textContent = data.rsi;
+        }
+
+        function renderConfidence(score) {
+            const el = document.getElementById('confFill');
+            el.style.width = `${score}%`;
+            const color = score >= 70 ? 'var(--accent-green)'
+                : score >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+            el.style.background = `linear-gradient(90deg, ${color}, ${color}88)`;
+            document.getElementById('confValue').textContent = `${score}%`;
+            document.getElementById('confLabel').textContent =
+                score >= 70 ? 'Sinyal Kuat' : score >= 50 ? 'Sinyal Moderat' : 'Sinyal Lemah';
+        }
+
+        // ============================================================
+        // FIBONACCI VISUALIZATION
+        // ============================================================
+
+        function renderFibChart(levels, currentPrice) {
+            const container = document.getElementById('fibChart');
+            const sortedLevels = Object.entries(levels).sort((a, b) => b[1] - a[1]);
+            const maxVal = sortedLevels[0][1];
+            const minVal = sortedLevels[sortedLevels.length - 1][1];
+            const range = maxVal - minVal || 1;
+
+            let html = '';
+            sortedLevels.forEach(([name, val]) => {
+                const pct = ((maxVal - val) / range) * 100;
+                const isNear = Math.abs(val - currentPrice) < (currentPrice * 0.015);
+                const isGolden = (name === '38.2%' || name === '50.0%' || name === '61.8%');
+                let cls = 'fib-level';
+                if (isNear) cls += ' fib-near';
+                if (isGolden) cls += ' fib-golden';
+
+                html += `
+                <div class="${cls}">
+                    <span class="fib-name">${name}</span>
+                    <div class="fib-line-wrap">
+                        <div class="fib-line"></div>
+                        ${isNear ? '<div class="fib-marker">◄ HARGA</div>' : ''}
+                    </div>
+                    <span class="fib-val">${formatNum(val)}</span>
+                </div>
+            `;
+            });
+            container.innerHTML = html;
+        }
+
+        // ============================================================
+        // INDICATOR BARS
+        // ============================================================
+
+        function renderIndicator(type, value, max) {
+            const bar = document.getElementById(type + 'Bar');
+            const valEl = document.getElementById(type + 'Value');
+            const pct = Math.min((value / max) * 100, 100);
+            bar.style.width = pct + '%';
+
+            valEl.textContent = value.toFixed(1);
+
+            if (type === 'rsi' || type === 'stoch') {
+                if (value < 25) { bar.style.background = '#22c55e'; valEl.textContent += ' (Oversold)'; }
+                else if (value > 75) { bar.style.background = '#ef4444'; valEl.textContent += ' (Overbought)'; }
+                else { bar.style.background = 'linear-gradient(90deg, #3b82f6, #8b5cf6)'; }
+            } else {
+                if (value > 25) { bar.style.background = '#22c55e'; valEl.textContent += ' (Kuat)'; }
+                else if (value > 15) { bar.style.background = '#f59e0b'; valEl.textContent += ' (Sedang)'; }
+                else { bar.style.background = '#ef4444'; valEl.textContent += ' (Lemah)'; }
+            }
+        }
+
+        // ============================================================
+        // PRICE CHART (Canvas)
+        // ============================================================
+
+        // CHART VARIABLE GLOBAL
+        let chart = null;
+        let candleSeries = null;
+
+        function renderPriceChart(history, fibLevels) {
+            const container = document.getElementById('priceChart');
+
+            // Cleanup existing chart
+            if (chart) {
+                chart.remove();
+                chart = null;
+            }
+
+            // Create Chart
+            if (typeof LightweightCharts === 'undefined') {
+                console.warn('LightweightCharts not ready, retrying in 500ms...');
+                container.innerHTML = '<div class="news-loading">Menyiapkan engine grafik...</div>';
+                setTimeout(() => renderPriceChart(history, fibLevels), 500);
+                return;
+            }
+
+            chart = LightweightCharts.createChart(container, {
+                width: container.clientWidth,
+                height: 320,
+                layout: {
+                    background: { color: '#0f172a' },
+                    textColor: '#94a3b8',
+                },
+                grid: {
+                    vertLines: { color: '#1e293b' },
+                    horzLines: { color: '#1e293b' },
+                },
+                timeScale: {
+                    borderColor: '#1e293b',
+                    timeVisible: true,
+                    secondsVisible: false,
+                },
+            });
+
+            // Use more robust series creation
+            try {
+                candleSeries = chart.addCandlestickSeries({
+                    upColor: '#22c55e',
+                    downColor: '#ef4444',
+                    borderVisible: false,
+                    wickUpColor: '#22c55e',
+                    wickDownColor: '#ef4444',
+                });
+            } catch (e) {
+                console.warn("Fallback to generic addSeries");
+                candleSeries = chart.addSeries(LightweightCharts.SeriesType.Candlestick, {
+                    upColor: '#22c55e',
+                    downColor: '#ef4444',
+                });
+            }
+
+            // Convert history to TV format
+            const data = history.map(h => ({
+                time: h.date,
+                open: h.open,
+                high: h.high,
+                low: h.low,
+                close: h.close,
+            }));
+
+            candleSeries.setData(data);
+
+            // Add Fibonacci Lines as PriceLines
+            const fibColors = {
+                '23.6%': '#6366f1', '38.2%': '#f59e0b',
+                '50.0%': '#8b5cf6', '61.8%': '#f59e0b',
+                '78.6%': '#6366f1'
+            };
+
+            Object.entries(fibLevels).forEach(([name, val]) => {
+                if (name === '0.0%' || name === '100%') return;
+                candleSeries.createPriceLine({
+                    price: val,
+                    color: fibColors[name] || '#475569',
+                    lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true,
+                    title: name,
+                });
+            });
+
+            chart.timeScale().fitContent();
+
+            // Handle Resize
+            new ResizeObserver(entries => {
+                if (entries.length === 0 || !chart) return;
+                const newWidth = entries[0].contentRect.width;
+                chart.applyOptions({ width: newWidth });
+            }).observe(container);
+        }
+
+        // ============================================================
+        // UTILS
+        // ============================================================
+
+        function formatNum(n) {
+            return new Intl.NumberFormat('id-ID').format(Math.round(n));
+        }
+
+        // Enter key support
+        document.getElementById('symbolInput').addEventListener('keyup', e => { if (e.key === 'Enter') analyze(); });
+        document.getElementById('priceInput').addEventListener('keyup', e => { if (e.key === 'Enter') analyze(); });
+
+        // ============================================================
+        // NEWS SYSTEM
+        // ============================================================
+
+        function renderNewsHTML(newsItems) {
+            if (!newsItems || newsItems.length === 0) {
+                return '<div class="news-empty">Tidak ada berita yang ditemukan.</div>';
+            }
+            return newsItems.map(n => `
+                <a href="${n.link}" target="_blank" rel="noopener" class="news-item">
+                    <div class="news-item-header">
+                        <span class="news-source" style="color:${n.source_color}">
+                            ${n.source_icon} ${n.source}
+                        </span>
+                        <span class="news-date">${n.date}</span>
+                    </div>
+                    <div class="news-title">${n.title}</div>
+                    ${n.summary ? `<div class="news-summary">${n.summary}</div>` : ''}
+                </a>
+            `).join('');
+        }
+
+        function toggleSentimentList() {
+            const list = document.getElementById('sentimentHeadlineList');
+            const banner = document.getElementById('sentimentBanner');
+            const icon = banner.querySelector('.sentiment-toggle-icon');
+
+            if (list.style.display === 'none') {
+                list.style.display = 'block';
+                list.style.animation = 'slideDown 0.3s ease-out';
+                icon.style.transform = 'rotate(180deg)';
+            } else {
+                list.style.display = 'none';
+                icon.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        async function loadMarketNews() {
+            try {
+                const res = await fetch('/api/news');
+                const contentType = res.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) return;
+                const data = await res.json();
+                document.getElementById('marketNewsList').innerHTML = renderNewsHTML(data.news);
+            } catch (err) {
+                document.getElementById('marketNewsList').innerHTML =
+                    '<div class="news-empty">Gagal memuat berita. Periksa koneksi internet.</div>';
+            }
+        }
+
+        async function loadStockNews(symbol) {
+            const row = document.getElementById('stockNewsRow');
+            const list = document.getElementById('stockNewsList');
+            document.getElementById('stockNewsTitle').textContent = symbol;
+            row.style.display = 'block';
+            list.innerHTML = '<div class="news-loading">Memuat berita ' + symbol + '...</div>';
+
+            try {
+                const res = await fetch('/api/news/' + symbol);
+                const contentType = res.headers.get('content-type') || '';
+                if (!contentType.includes('application/json')) return;
+                const data = await res.json();
+
+                if (data.news && data.news.length > 0) {
+                    list.innerHTML = renderNewsHTML(data.news);
+                } else {
+                    list.innerHTML = '<div class="news-empty">Tidak ada berita terbaru untuk ' + symbol + '.</div>';
+                }
+            } catch (err) {
+                list.innerHTML = '<div class="news-empty">Gagal memuat berita.</div>';
+            }
+        }
+
+        // ============================================================
+        // BACKTEST & POSITION SIZING
+        // ============================================================
+
+        async function loadBacktest(symbol) {
+            const el = document.getElementById('backtestContent');
+            el.innerHTML = '<div class="news-loading">Menghitung win rate ' + symbol + '... (30-60 detik)</div>';
+            try {
+                const res = await fetch('/api/backtest/' + symbol);
+                const data = await res.json();
+                if (data.error && data.total_trades === 0) {
+                    el.innerHTML = '<div class="news-empty">' + data.error + '</div>';
+                    return;
+                }
+                const wrColor = data.win_rate >= 60 ? 'var(--accent-green)'
+                    : data.win_rate >= 45 ? 'var(--accent-yellow)' : 'var(--accent-red)';
+                let html = `
+                    <div class="bt-stats">
+                        <div class="bt-stat">
+                            <div class="bt-stat-value" style="color:${wrColor}">${data.win_rate}%</div>
+                            <div class="bt-stat-label">Win Rate</div>
+                        </div>
+                        <div class="bt-stat">
+                            <div class="bt-stat-value">${data.avg_return >= 0 ? '+' : ''}${data.avg_return}%</div>
+                            <div class="bt-stat-label">Avg Return</div>
+                        </div>
+                        <div class="bt-stat">
+                            <div class="bt-stat-value" style="color:var(--accent-red)">${data.max_drawdown}%</div>
+                            <div class="bt-stat-label">Max Drawdown</div>
+                        </div>
+                        <div class="bt-stat">
+                            <div class="bt-stat-value">${data.tp_hit_rate}%</div>
+                            <div class="bt-stat-label">TP Hit Rate</div>
+                        </div>
+                    </div>
+                    <div class="bt-detail">
+                        ${data.total_trades} sinyal (${data.strong_buy_count} STRONG BUY: ${data.strong_buy_wr}% WR, ${data.buy_count} BUY: ${data.buy_wr}% WR)
+                    </div>`;
+                if (data.trades && data.trades.length > 0) {
+                    html += '<div class="bt-trades">';
+                    data.trades.slice(-5).forEach(t => {
+                        const icon = t.is_win ? '✅' : '❌';
+                        html += `<div class="bt-trade">${icon} ${t.date} | ${t.pnl_pct >= 0 ? '+' : ''}${t.pnl_pct}%</div>`;
+                    });
+                    html += '</div>';
+                }
+                el.innerHTML = html;
+
+                // Update confidence with backtest data
+                if (data.win_rate > 0 && window._lastAnalysis) {
+                    const d = window._lastAnalysis;
+                    const mtfScore = d.multi_timeframe ? d.multi_timeframe.confluence_score : d.score;
+                    const confScore = Math.round((d.score * 0.3) + (mtfScore * 0.3) + (data.win_rate * 0.4));
+                    renderConfidence(confScore);
+                }
+            } catch (err) {
+                el.innerHTML = '<div class="news-empty">Gagal menghitung backtest.</div>';
+            }
+        }
+
+        async function calcPosition() {
+            const d = window._lastAnalysis;
+            if (!d) return;
+            const modal = parseFloat(document.getElementById('modalInput').value) || 10000000;
+            const riskPct = parseFloat(document.getElementById('riskInput').value) || 2;
+
+            try {
+                const res = await fetch('/api/position-size', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        modal: modal, risk_pct: riskPct,
+                        entry: d.buy_price, stop_loss: d.stop_loss
+                    })
+                });
+                const data = await res.json();
+                if (data.error) {
+                    document.getElementById('possizeResult').innerHTML =
+                        `<div class="news-empty">${data.error}</div>`;
+                    return;
+                }
+                document.getElementById('possizeResult').innerHTML = `
+                    <div class="ps-grid">
+                        <div class="ps-item"><span>📦 Lot</span><strong>${data.lots} lot (${formatNum(data.shares)} lembar)</strong></div>
+                        <div class="ps-item"><span>💵 Total Biaya</span><strong>Rp ${formatNum(data.total_cost)}</strong></div>
+                        <div class="ps-item"><span>⚠️ Risiko Aktual</span><strong>Rp ${formatNum(data.actual_risk)}</strong></div>
+                        <div class="ps-item"><span>📊 % Modal</span><strong>${data.pct_modal_used}%</strong></div>
+                    </div>`;
+            } catch (err) {
+                document.getElementById('possizeResult').innerHTML =
+                    '<div class="news-empty">Gagal menghitung.</div>';
+            }
+        }
+
+        // Watchlist Logic
+        let watchlist = [];
+
+        async function loadWatchlist() {
+            try {
+                const res = await fetch('/api/watchlist');
+                watchlist = await res.json();
+                renderWatchlist();
+            } catch (err) {
+                console.error("Gagal load watchlist", err);
+            }
+        }
+
+        function toggleWatchlist() {
+            const sidebar = document.getElementById('watchlistSidebar');
+            const overlay = document.getElementById('overlay');
+            sidebar.classList.toggle('open');
+            overlay.classList.toggle('open');
+            if (sidebar.classList.contains('open')) {
+                loadWatchlist();
+            }
+        }
+
+        async function handleWatchlistToggle() {
+            const data = window._lastAnalysis;
+            if (!data) return;
+
+            const btn = document.getElementById('watchlistBtn');
+            const isInWatchlist = watchlist.some(item => item.symbol === data.symbol);
+
+            if (isInWatchlist) {
+                // Remove
+                await fetch(`/api/watchlist/${data.symbol}`, { method: 'DELETE' });
+            } else {
+                // Add
+                await fetch('/api/watchlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        symbol: data.symbol,
+                        price: data.buy_price,
+                        signal: data.signal,
+                        score: data.score
+                    })
+                });
+            }
+
+            await loadWatchlist();
+            updateWatchlistBtnState();
+        }
+
+        function updateWatchlistBtnState() {
+            const data = window._lastAnalysis;
+            if (!data) return;
+            const btn = document.getElementById('watchlistBtn');
+            const isInWatchlist = watchlist.some(item => item.symbol === data.symbol);
+            btn.classList.toggle('active', isInWatchlist);
+        }
+
+        function renderWatchlist() {
+            const container = document.getElementById('watchlistContent');
+            if (watchlist.length === 0) {
+                container.innerHTML = '<div class="empty-state">Belum ada saham favorit.</div>';
+                return;
+            }
+
+            container.innerHTML = watchlist.map(item => {
+                const color = item.last_score >= 70 ? 'var(--accent-cyan)' : (item.last_score >= 50 ? 'var(--accent-green)' : 'var(--accent-red)');
+                return `
+                <div class="watchlist-item" onclick="quickAnalyze('${item.symbol}')">
+                    <div class="wl-info">
+                        <span class="wl-symbol">${item.symbol}</span>
+                        <span class="wl-price">Rp ${formatNum(item.last_price)}</span>
+                    </div>
+                    <div class="wl-stats">
+                        <a href="https://stockbit.com/symbol/${item.symbol}" target="_blank" class="sc-stream-link" onclick="event.stopPropagation();" title="Stockbit Stream">💬</a>
+                        <div class="wl-score" style="background:${color}33; color:${color}">${item.last_score}</div>
+                        <button class="wl-del" onclick="event.stopPropagation(); deleteFromWatchlist('${item.symbol}')">🗑️</button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        async function deleteFromWatchlist(symbol) {
+            await fetch(`/api/watchlist/${symbol}`, { method: 'DELETE' });
+            await loadWatchlist();
+            updateWatchlistBtnState();
+        }
+
+        // Screener Logic
+        let currentScannerType = 'LQ45';
+
+        async function switchScanner(type) {
+            currentScannerType = type;
+            document.querySelectorAll('.screener-tab').forEach(t => t.classList.remove('active'));
+            if (type === 'LQ45') document.getElementById('tabLQ45').classList.add('active');
+            else document.getElementById('tabMB').classList.add('active');
+            
+            loadScreener();
+        }
+
+        async function loadScreener() {
+            const container = document.getElementById('screenerContent');
+            try {
+                const res = await fetch(`/api/screener?type=${currentScannerType}`);
+                const data = await res.json();
+
+                if (data.length === 0) {
+                    container.innerHTML = `<div class="screener-loading">Data ${currentScannerType} belum tersedia. Klik "Refresh Scan" untuk memulai.</div>`;
+                    return;
+                }
+
+                // Urutkan berdasarkan skor tertinggi (just in case)
+                const sorted = data.sort((a, b) => b.score - a.score).slice(0, 8);
+
+                container.innerHTML = sorted.map(d => {
+                    const color = d.score >= 70 ? 'var(--accent-cyan)' : (d.score >= 50 ? 'var(--accent-green)' : 'var(--accent-red)');
+                    const signal = d.signal.replace('_', ' ');
+                    const isMB = d.scanner_type === 'MULTIBAGGER' || currentScannerType === 'MULTIBAGGER';
+                    
+                    return `
+                    <div class="screener-item ${isMB ? 'mb-item' : ''}" onclick="quickAnalyze('${d.symbol}')">
+                        <div class="sc-top">
+                            <span class="sc-symbol">${isMB ? '🚀 ' : ''}${d.symbol}</span>
+                            <a href="https://stockbit.com/symbol/${d.symbol}" target="_blank" class="sc-stream-link" onclick="event.stopPropagation();" title="Stockbit Stream">💬</a>
+                            <span class="sc-score" style="background:${color}33; color:${color}">${d.score}</span>
+                        </div>
+                        <div class="sc-signal">${signal}</div>
+                        <div class="sc-prices">
+                            <span class="sc-target">🎯 Target: ${formatNum(d.sell_target)}</span>
+                            <span>🛑 Stop Loss: ${formatNum(d.stop_loss)}</span>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (err) {
+                container.innerHTML = '<div class="screener-loading">Gagal memuat data screener.</div>';
+            }
+        }
+
+        async function runScreenerManual() {
+            const btn = document.getElementById('runScreenerBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '⏳ Scanning...';
+            btn.disabled = true;
+            try {
+                await fetch(`/api/screener/run?type=${currentScannerType}`, { method: 'POST' });
+                alert(`Scan ${currentScannerType} dimulai di background. Silakan tunggu sekitar 1 menit lalu refresh halaman.`);
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                    btn.disabled = false;
+                    loadScreener();
+                }, 5000);
+            } catch (err) {
+                alert("Gagal memulai scan.");
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // Telegram Helpers
+        async function testTelegram() {
+            try {
+                // Sync first
+                await fetch('/api/telegram/sync');
+
+                const res = await fetch('/api/telegram/test', { method: 'POST' });
+                const data = await res.json();
+
+                if (data.success) {
+                    alert(`✅ Notifikasi terkirim ke ${data.delivered_to} Chat ID.\nJika belum ada pesan masuk, pastikan Anda sudah klik START di @SahamanalisBot.`);
+                } else {
+                    alert('❌ Gagal: ' + (data.error || 'Terjadi kesalahan'));
+                }
+            } catch (err) {
+                alert('Gagal menghubungkan ke server Telegram.');
+            }
+        }
+
+        // Auto-load market news, watchlist & screener on page load
+        loadMarketNews();
+        loadWatchlist();
+        loadScreener();
+        fetch('/api/telegram/sync'); // Silently sync on load
+        function typeWriterEffect(elementId, text) {
+            const el = document.getElementById(elementId);
+            el.innerHTML = "";
+            let i = 0;
+
+            // Clean markdown bold/bullet for simple display if needed, 
+            // or use a simple marked conversion if we had a library.
+            // For now, let's just parse basic ** and \n
+            let formattedText = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
+
+            // To avoid flickering, we'll set it at once if too long, 
+            // but let's try a fast typing for short narratives.
+            let currentText = "";
+            const interval = setInterval(() => {
+                if (i < text.length) {
+                    // This is naive typing for HTML, usually we'd use a better way
+                    // but for simpler display let's just set it.
+                    el.innerHTML = formattedText.substring(0, formattedText.length); // Instant for now for UX stability
+                    clearInterval(interval);
+                }
+            }, 5);
+        }
+    </script>
+</body>
+
+</html>
